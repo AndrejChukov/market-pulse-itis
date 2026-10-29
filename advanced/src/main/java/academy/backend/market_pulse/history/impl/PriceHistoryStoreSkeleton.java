@@ -1,10 +1,20 @@
 package academy.backend.market_pulse.history.impl;
 
-import java.nio.file.Path;
-import java.util.List;
-
 import academy.backend.market_pulse.history.PriceHistoryStore;
 import academy.backend.market_pulse.history.PricePoint;
+
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Заготовка для самостоятельной работы (см. «Требования к файловому хранилищу.md», семинар 7) —
@@ -18,16 +28,55 @@ public class PriceHistoryStoreSkeleton implements PriceHistoryStore {
 
     @Override
     public Path append(Path directory, PricePoint point) {
-        // TODO: записать точку в новый файл внутри directory — существующие файлы не трогать.
-        //  Подсказка: имя файла на основе point.timestamp() даёт сортировку по имени = сортировку
-        //  по времени.
-        throw new UnsupportedOperationException("TODO: реализовать запись точки истории цены");
+        try {
+            Path tickerDir = directory.resolve(point.ticker());
+            Files.createDirectories(tickerDir);
+
+            Path filePath = tickerDir.resolve(point.timestamp() + ".txt");
+            String content = point.timestamp() + "," + point.price();
+
+            Files.writeString(filePath, content);
+
+            return filePath;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public List<PricePoint> load(Path directory, String ticker) {
-        // TODO: прочитать все точки по тикеру в порядке возрастания времени.
-        //  Если для тикера ещё нет точек — вернуть пустой список, а не бросать исключение.
-        throw new UnsupportedOperationException("TODO: реализовать чтение истории цены");
+        Path tickerDir = directory.resolve(ticker);
+
+        if (Files.notExists(tickerDir)) {
+            return List.of();
+        }
+
+        try (Stream<Path> filesStream = Files.list(tickerDir)) {
+            return filesStream
+                    .sorted(Comparator.comparing(path -> path.getFileName().toString()))
+                    .map(this::readPointFromFile)
+                    .toList();
+        } catch (NoSuchFileException e) {
+            return List.of();
+        }
+        catch (IOException e) {
+            throw new RuntimeException("Ошибка чтения истории цен для тикера: " + ticker, e);
+        }
+    }
+
+    private PricePoint readPointFromFile(Path filePath) {
+        try {
+            String line = Files.readString(filePath);
+            String[] parts = line.split(",");
+
+            Instant timestamp = Instant.parse(parts[0]);
+            BigDecimal price = new BigDecimal(parts[1]);
+
+            String ticker = filePath.getParent().getFileName().toString();
+
+            return new PricePoint(ticker, timestamp, price);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
