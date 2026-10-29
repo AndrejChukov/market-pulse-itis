@@ -20,7 +20,7 @@ public final class InstrumentFactories {
     private InstrumentFactories() {
     }
 
-    public static Instrument create(String type, String ticker, String name, Currency currency) {
+public static Instrument create(String type, String ticker, String name, Currency currency) {
         return REGISTRY.find(type.toUpperCase())
                 .map(factory -> factory.create(ticker, name, currency))
                 .orElseThrow(() -> new IllegalArgumentException("Unknown instrument type: " + type));
