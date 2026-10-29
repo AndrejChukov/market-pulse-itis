@@ -1,10 +1,20 @@
 package academy.backend.market_pulse.repository.store.impl;
 
+import academy.backend.market_pulse.factory.InstrumentFactories;
+import academy.backend.market_pulse.model.Currency;
+import academy.backend.market_pulse.model.Instrument;
+import academy.backend.market_pulse.model.Quote;
+import academy.backend.market_pulse.model.Stock;
+import academy.backend.market_pulse.repository.store.QuoteFileStore;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
-
-import academy.backend.market_pulse.model.Quote;
-import academy.backend.market_pulse.repository.store.QuoteFileStore;
+import java.util.stream.Collectors;
 
 /**
  * Заготовка для самостоятельной работы (см. «Требования к файловому хранилищу.md», семинар 7) —
@@ -16,17 +26,39 @@ public class QuoteFileStoreSkeleton implements QuoteFileStore {
 
     @Override
     public void save(Path path, List<Quote> quotes) {
-        // TODO: сохранить котировки в файл по указанному пути.
-        //  Подсказка: на каждую котировку нужно сохранить тикер, тип и валюту инструмента (чтобы
-        //  потом восстановить его через InstrumentFactories.create), а также цену и изменение за
-        //  период — этого достаточно, чтобы собрать Quote обратно.
-        throw new UnsupportedOperationException("TODO: реализовать сохранение котировок в файл");
+        try (BufferedWriter br = Files.newBufferedWriter(path)) {
+            for (Quote quote : quotes) {
+                String output = quote.getInstrument().getTicker() + "," +
+                        quote.getInstrument().getType() + "," +
+                        quote.getInstrument().getCurrency() + "," +
+                        quote.getInstrument().getName() + "," +
+                        quote.getPrice() + "," +
+                        quote.getChangePercent();
+                br.write(output);
+                br.newLine();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
     public List<Quote> load(Path path) {
-        // TODO: прочитать котировки из файла и восстановить при старте.
-        //  Если файла ещё нет (первый запуск) — вернуть пустой список, а не бросать исключение.
-        throw new UnsupportedOperationException("TODO: реализовать чтение котировок из файла");
+        try {
+            return Files.readAllLines(path).stream()
+                    .map(line -> {
+                        String[] parts = line.split(",");
+                        return new Quote(
+                                InstrumentFactories.create(parts[1], parts[0], parts[3], Currency.valueOf(parts[2])),
+                                new BigDecimal(parts[4].trim()),
+                                new BigDecimal(parts[5].trim())
+                        );
+                    })
+                    .collect(Collectors.toList());
+        } catch (NoSuchFileException e) {
+            return List.of();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
